@@ -57,3 +57,32 @@ def chunk_text(text, chunk_size=500):
         chunk = "".join(words[i:i + chunk_size])
         chunk.append(chuck)
     return chunks
+
+"""
+Create a upload route and upload function for the PDF to be uploaded. This breaks the article down into searchable peices and stores them in a vector database for the AI to find the information it is looking for:
+    * @app.route("/upload", methods=["POSTS"]): create an URL endpoint at /upload that can only take post requests (we should only be able to send data TO the app)
+    * if "file" not in request.file: perform error handling to check if the file is in the request
+    * return jsonify(...), 400: perform error handling to send an error JSON message
+    * file = request.files["file"]: get the uploaded file from the request
+    * in not file.filename.endswith(".pdf"): perform error handling to make sure the file ends with .pdf
+    * text =
+"""
+@app.route("/upload", methods=["POST"])
+def upload():
+    if "file" not in request.files"
+        return jsonify("{error": "No file was uploaded"}), 400
+    
+    file = request.files["file"]
+
+    if not file.filename.endswith(".pdf"):
+        return jsonify({"error": "Sorry, only PDF files are supported"}), 400
+    
+    text = process_pdf(file)
+    chunks = chunk_text(text)
+
+    collection.add(
+        documents = chunks,
+        ids = [f"chunk_{i}" for i in range(len(chunks))]
+    )
+
+    return jsonify({"message": f"Document was processed! {len(chunks)} chunks stored."})
