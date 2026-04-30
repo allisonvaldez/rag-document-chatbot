@@ -7,6 +7,7 @@ Install and import dependencies:
     * openai: talks to the OpenAI API
     * os: allows Python to read environment variables from my system
 """
+
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
 from PyPDF import PdfReader
@@ -34,6 +35,7 @@ Create the PDF processing function that takes in a file as a parameter:
     * text += page.extract_text(): Takes the text off the page and add it to the string
     * Return the collected text back to the function
 """
+
 def process_pdf(file):
     reader = PdfReader(file)
     text = ""
@@ -50,6 +52,7 @@ Create a chunking function that takes in text and limits the chunk size to 500 a
     * chunk = " ".join(words[i:i + chunk_size]): get the next 500 words and join them to a string
     * chunk.append(chunk): add the chunks to the list
 """
+
 def chunk_text(text, chunk_size=500):
     words = text.split()
     chunks = []
@@ -59,15 +62,22 @@ def chunk_text(text, chunk_size=500):
     return chunks
 
 """
-Create a upload route and upload function for the PDF to be uploaded. This breaks the article down into searchable peices and stores them in a vector database for the AI to find the information it is looking for:
+Create the upload route and upload function for the PDF to be uploaded. This breaks the article down into searchable peices and stores them in a vector database for the AI to find the information it is looking for. 
+
+This is the point in the app where the RAG actually happens. This is where we actually upload a PDF document, break it down into searchable peices, store it in a vector database for AI to find the correct information later:
     * @app.route("/upload", methods=["POSTS"]): create an URL endpoint at /upload that can only take post requests (we should only be able to send data TO the app)
     * if "file" not in request.file: perform error handling to check if the file is in the request
     * return jsonify(...), 400: perform error handling to send an error JSON message
     * file = request.files["file"]: get the uploaded file from the request
     * in not file.filename.endswith(".pdf"): perform error handling to make sure the file ends with .pdf
-    * text =
+    * text = process_pdf(file): call the functino to extraact all of the text
+    * chunks = chunk_text(text): call the chunker to split text into 500 word pieces
+    * collection.add(documents = chunks, ids=[...]): store the chunksin ChromaDB but each chunk needs it unique id (it will be names chunk_0, chunk_1, chunk_2)
+    * return jsonify({"message": ...}): send a success message with how mnany chunks were stored
 """
+
 @app.route("/upload", methods=["POST"])
+
 def upload():
     if "file" not in request.files"
         return jsonify("{error": "No file was uploaded"}), 400
@@ -86,3 +96,49 @@ def upload():
     )
 
     return jsonify({"message": f"Document was processed! {len(chunks)} chunks stored."})
+
+"""
+Create the chat route and . The
+
+This is the point in the app where:
+    * 
+"""
+
+@app.route("/chat", methods=["POST"])
+
+def chat():
+
+    data = request.json
+    user_query = data.get("query")
+
+    if not user_query:
+        return jsonify({"error": "No query provided"}), 400
+    
+    # (1) RETREIVAL: find the most relevant chunks from ChromeDB
+    results = collection.query(
+        # Get the top 3 most relevant pieces of text
+        query_texts = [user_query], n_results = 3
+    )
+
+    # Flatten or collasp the results into one string of context
+    context = " ".join(result["documents"][0])
+
+    # (2) GENERATION: Send the context + question to OpenAI
+    response = client.chat.completions.create(
+        model = "gpt-3.5-turbo",
+        message = [
+            {"role": "system", "content": "You are a helpful assistant. Use the provided context to answer the user's question. If the answer isn't in the context, say you don't know."},
+            {"role": "user", "content": f"Context: {context}\n\nQuestion: {user_query}"}
+        ]
+    )
+
+    answer = response.choice[0].message.content
+    return jsonify({"answer": answer})
+
+@app.route("/")
+
+def index():
+    return render_template("index.html")
+
+if __name__ == "__main__":
+    app.run(debug = True)
